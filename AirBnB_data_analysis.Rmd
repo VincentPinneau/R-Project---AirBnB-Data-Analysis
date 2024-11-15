@@ -1,0 +1,594 @@
+---
+title: "Airbnb data analysis"
+author: "Vincent Pinneau"
+date: "2024-04-05"
+output: html_document
+---
+
+# Setup
+
+## Loading the libraries
+
+```{r}
+library(ggplot2)
+library(dplyr)
+```
+
+## Loading the data
+
+```{r}
+rm(list=ls())
+getwd()
+setwd("C:/Users/vince/OneDrive/Documents/DSTI/Big Data Processing with R")
+load("Project/AirBnB.Rdata")
+```
+
+# Relationship between prices and apartment features
+
+## Data preparation
+
+We start by filtering to keep only the apartments in our dataset.
+
+```{r}
+L2 = filter(L, property_type == 'Apartment')
+```
+
+Then we need to turn the prices into numerical values to be able to do calculations. We remove the dollar sign then declare the value as numerical.
+
+```{r}
+L2$price <- as.numeric(gsub("\\$", "", L2$price))
+L2$weekly_price <- as.numeric(gsub("\\$", "", L2$weekly_price))
+L2$monthly_price <- as.numeric(gsub("\\$", "", L2$monthly_price))
+```
+
+Finally, our last problem is that amenities are in a JSON structure. We need to isolate the amenities that interest us to be able to use them in our analysis.
+
+We start by creating a dummy variable that identifies if the amenity we are looking for is in the JSON structure.
+Then we merge this new dummy variable with our dataset and change the names TRUE and FALSE to make the data more readable.
+
+```{r}
+TV <- grepl("TV",L2$amenities)
+L2 <- cbind(L2, TV)
+L2$TV[L2$TV == TRUE] <- 'TV'
+L2$TV[L2$TV == FALSE] <- 'No TV'
+
+Internet <- grepl("Internet",L2$amenities)
+L2 <- cbind(L2, Internet)
+L2$Internet[L2$Internet == TRUE] <- 'Internet'
+L2$Internet[L2$Internet == FALSE] <- 'No Internet'
+
+Kitchen <- grepl("Kitchen",L2$amenities)
+L2 <- cbind(L2, Kitchen)
+L2$Kitchen[L2$Kitchen == TRUE] <- 'Kitchen'
+L2$Kitchen[L2$Kitchen == FALSE] <- 'No Kitchen'
+
+Heating <- grepl("Heating",L2$amenities)
+L2 <- cbind(L2, Heating)
+L2$Heating[L2$Heating == TRUE] <- 'Heating'
+L2$Heating[L2$Heating == FALSE] <- 'No heating'
+
+Smoking <- grepl("Smoking Allowed",L2$amenities)
+L2 <- cbind(L2, Smoking)
+L2$Smoking[L2$Smoking == TRUE] <- 'Smoking allowed'
+L2$Smoking[L2$Smoking == FALSE] <- 'No smoking'
+
+Washer <- grepl("Washer",L2$amenities)
+L2 <- cbind(L2, Washer)
+L2$Washer[L2$Washer == TRUE] <- 'Washer'
+L2$Washer[L2$Washer == FALSE] <- 'No washer'
+
+Dryer <- grepl("Dryer",L2$amenities)
+L2 <- cbind(L2, Dryer)
+L2$Dryer[L2$Dryer == TRUE] <- 'Dryer'
+L2$Dryer[L2$Dryer == FALSE] <- 'No dryer'
+
+Air_Conditioning <- grepl("Air Conditioning",L2$amenities)
+L2 <- cbind(L2, Air_Conditioning)
+L2$Air_Conditioning[L2$Air_Conditioning == TRUE] <- 'Air conditioning'
+L2$Air_Conditioning[L2$Air_Conditioning == FALSE] <- 'No air conditioning'
+```
+
+## Data analysis
+
+### Size of the homes/apt
+
+The first thing we expect, is that the bigger the home, the higher the price will be.
+
+```{r}
+average_price_by_accomodates <- L2 %>%
+  group_by(accommodates,room_type) %>%
+  summarize(average_price = mean(price, na.rm = TRUE))
+
+average_price_by_bathrooms <- L2 %>%
+  group_by(bathrooms, room_type) %>%
+  summarize(average_price = mean(price, na.rm = TRUE))
+
+average_price_by_bedrooms <- L2 %>%
+  group_by(bedrooms, room_type) %>%
+  summarize(average_price = mean(price, na.rm = TRUE))
+
+average_price_by_beds <- L2 %>%
+  group_by(beds, room_type) %>%
+  summarize(average_price = mean(price, na.rm = TRUE))
+
+print(average_price_by_accomodates)
+print(average_price_by_bathrooms)
+print(average_price_by_bedrooms)
+print(average_price_by_beds)
+```
+A linear relationship appears between the size of the house and the price on airbnb when we look at the number of people a house can accommodate. Nevertheless, even though the tables give the precise means, a plot would be better to visualize the relationship.
+
+```{r}
+grouped.L2 = group_by(L2,accommodates, room_type)
+out = summarise(grouped.L2,
+                price_mean = mean(price,na.rm=TRUE))
+ggplot(data = out) +
+  theme_light() +
+  geom_line(aes(x = accommodates,y = price_mean)) +
+  facet_wrap(~room_type)
+```
+
+The data shows that there is indeed a linear relationship between the number of people the house can accommodate and its price except for shared rooms. We can also add that the slope of the relationship is more important when the entire home/apt is rented. When the entire home/apt is rented, each new person (up to 15) adds approximately 32 $ to the price, whereas for the private rooms, each new person (up to 15) adds on average less than 25 $.
+
+```{r}
+grouped.L2 = group_by(L2,bedrooms, room_type)
+out = summarise(grouped.L2,
+                price_mean = mean(price,na.rm=TRUE))
+ggplot(data = out) +
+  theme_light() +
+  geom_line(aes(x = bedrooms,y = price_mean)) +
+  facet_wrap(~room_type)
+```
+
+For the number of bedrooms, we also have a linear relationship when the entire home/apt is rented, with an average of 100 $ per additional bedroom.
+
+```{r}
+grouped.L2 = group_by(L2,beds, room_type)
+out = summarise(grouped.L2,
+                price_mean = mean(price,na.rm=TRUE))
+ggplot(data = out) +
+  theme_light() +
+  geom_line(aes(x = beds,y = price_mean)) +
+  facet_wrap(~room_type)
+```
+
+
+For the number of beds, there is a clear linear relationship when the entire home/apt is rented, with an average of 50 $ per additional bed. On the other hand, for the private rooms, the price only increases until we reach a number of 7 beds, with an average of 26 $ for each new bed. After that the price stops increasing and even decreases, maybe because above 7 they become closer to a dormitory than a room, meaning that the confort decreases. Finally, for the shared room, there is no relationship, meaning that this type of room people do not come in groups and rent on their own, so the number of beds does not matter to them.
+
+```{r}
+grouped.L2 = group_by(L2,bathrooms, room_type)
+out = summarise(grouped.L2,
+                price_mean = mean(price,na.rm=TRUE))
+ggplot(data = out) +
+  theme_light() +
+  geom_line(aes(x = bathrooms,y = price_mean)) +
+  facet_wrap(~room_type)
+```
+
+
+For the last variable, the number of bathrooms, the dynamic is very different. First of all, for the private rooms and the shared rooms, the number of bathrooms does not have an influence on the price. Then for the entire home/apt, it has a positive influence, but only to a certain extent. It increases by 100 $ for each additional bathroom until 2. Then from 2 bathrooms to 3, there is an increase of 200 $, but after that, the price stops increasing and even drops when we get to 6 bathrooms. This could come from the fact that a second or a third bathroom is useful for a group, but above that number there is no real increase in comfort.
+
+### Amenities
+
+We compare the average renting prices, depending on whether they have certain amenities.
+
+#### TV
+
+```{r}
+average_price_by_TV <- L2 %>%
+  group_by(TV) %>%
+  summarize(average_price = mean(price, na.rm = TRUE)) 
+
+average_pricediff_TV <- ((average_price_by_TV[2,2][[1]] - average_price_by_TV[1,2][[1]])/average_price_by_TV[1,2][[1]])*100
+
+average_price_by_TV
+average_pricediff_TV
+
+```
+We can see that on average, adding a TV increases the value of the rent by 53 %.
+
+#### Internet
+
+```{r}
+average_price_by_Internet <- L2 %>%
+  group_by(Internet) %>%
+  summarize(average_price = mean(price, na.rm = TRUE)) 
+
+average_pricediff_Internet <- ((average_price_by_Internet[1,2][[1]] - average_price_by_Internet[2,2][[1]])/average_price_by_Internet[2,2][[1]])*100
+
+average_price_by_Internet
+average_pricediff_Internet
+
+```
+We can see that on average, adding Internet increases the value of the rent by 29 %.
+
+#### Kitchen
+
+```{r}
+average_price_by_Kitchen <- L2 %>%
+  group_by(Kitchen) %>%
+  summarize(average_price = mean(price, na.rm = TRUE)) 
+
+average_pricediff_Kitchen <- ((average_price_by_Kitchen[1,2][[1]] - average_price_by_Kitchen[2,2][[1]])/average_price_by_Kitchen[2,2][[1]])*100
+
+average_price_by_Kitchen
+average_pricediff_Kitchen
+
+```
+
+We can see that on average, adding a kitchen increases the value of the rent by 17 %.
+
+#### Smoking Allowed
+
+```{r}
+average_price_by_smoking <- L2 %>%
+  group_by(Smoking) %>%
+  summarize(average_price = mean(price, na.rm = TRUE)) 
+
+average_pricediff_smoking <- ((average_price_by_smoking[2,2][[1]] - average_price_by_smoking[1,2][[1]])/average_price_by_smoking[1,2][[1]])*100
+
+average_price_by_smoking
+average_pricediff_smoking
+
+```
+
+We can see that on average, by allowing smoking, the value of the rent decreases by 22%. There could be a bias where homes/apts that already had a low value, allow smoking to try and attract customers, whereas owners of nice homes/apts might be more reluctant to allow smoking.
+
+#### Heating
+
+```{r}
+average_price_by_Heating <- L2 %>%
+  group_by(Heating) %>%
+  summarize(average_price = mean(price, na.rm = TRUE)) 
+
+average_pricediff_Heating <- ((average_price_by_Heating[1,2][[1]] - average_price_by_Heating[2,2][[1]])/average_price_by_Heating[2,2][[1]])*100
+
+average_price_by_Heating
+average_pricediff_Heating
+
+```
+
+We can see that on average, adding heating increases the value of the rent by 12 %.
+
+#### Washer
+
+```{r}
+average_price_by_washer <- L2 %>%
+  group_by(Washer) %>%
+  summarize(average_price = mean(price, na.rm = TRUE)) 
+
+average_pricediff_washer <- ((average_price_by_washer[2,2][[1]] - average_price_by_washer[1,2][[1]])/average_price_by_washer[1,2][[1]])*100
+
+average_price_by_washer
+average_pricediff_washer
+
+```
+
+We can see that on average, adding a washer increases the value of the rent by 43 %.
+
+#### Dryer
+
+```{r}
+average_price_by_Dryer <- L2 %>%
+  group_by(Dryer) %>%
+  summarize(average_price = mean(price, na.rm = TRUE)) 
+
+average_pricediff_Dryer <- ((average_price_by_Dryer[1,2][[1]] - average_price_by_Dryer[2,2][[1]])/average_price_by_Dryer[2,2][[1]])*100
+
+average_price_by_Dryer
+average_pricediff_Dryer
+
+```
+
+We can see that on average, adding a dryer increases the value of the rent by 37 %.
+
+#### Air Conditioning
+
+```{r}
+average_price_by_AC <- L2 %>%
+  group_by(Air_Conditioning) %>%
+  summarize(average_price = mean(price, na.rm = TRUE)) 
+
+average_pricediff_AC <- ((average_price_by_AC[1,2][[1]] - average_price_by_AC[2,2][[1]])/average_price_by_AC[2,2][[1]])*100
+
+average_price_by_AC
+average_pricediff_AC
+```
+We can see that on average, adding air conditioning increases the value of the rent by 66 %.
+
+#### Conclusion
+
+To conclude, here is the ranking by amenity :
+
+Air conditioning : + 66 % <br/>
+              TV : + 53 % <br/>
+          Washer : + 43 % <br/>
+           Dryer : + 37 % <br/>
+        Internet : + 29 % <br/>
+         Kitchen : + 17 % <br/>
+         Heating : + 12 % <br/>
+Allowing smoking : - 22 % <br/>
+
+Seeing air conditioning being at the top seems logical, because people usually rent homes on airbnb during their summer vacations and will want to have a place to rest protected from the heat waves.
+
+# Number of apartments per owner
+
+## Data preparation
+
+Several variables in our dataset give us information on the number of listings of each host, such as: <br/>
+- host_listings_count <br/>
+- host_total_listings_count <br/>
+- calculated_host_listings_count <br/>
+
+Unfortunately, these numbers regoup all the different types of listings, not only apartments, so we will create a new variable that only counts the number of apartments per owner.
+
+```{r}
+L3 <- filter(L, property_type == 'Apartment')
+
+counts <- L3 %>%
+  # counts the number of apartments for each host
+  group_by(host_id) %>%
+  summarise(apartments_count = n())
+```
+
+This new dataframe 'counts' gives the unique host id's in the first column and their number of apartments in the second column.
+
+We can now merge this new dataframe to the original one using host_id as a key.
+
+```{r}
+L3 <- merge(L3, counts, by = "host_id", all.x = TRUE)
+```
+
+We can now start analysing this data.
+
+## Data analysis
+
+```{r}
+summary(L3$apartments_count)
+```
+The data seems to be heavily skewed to the right, with more than 75% of the owners that have only 1 apartment. Which we can confirm with the plots.
+
+```{r}
+ggplot(data = L3) +
+  theme_light() +
+  geom_histogram(aes(x = apartments_count), bins = 160) +
+  labs(y = "owners_count")
+```
+
+```{r}
+ggplot(data = L3) +
+  theme_light() +
+  geom_histogram(aes(x = apartments_count), bins = 160) +
+  labs(y = "owners_count") +
+  xlim(0,153) +
+  ylim (0,5000)
+```
+
+```{r}
+ggplot(data = L3) +
+  theme_light() +
+  geom_histogram(aes(x = apartments_count), bins = 160) +
+  labs(y = "owners_count") +
+  xlim(0,153) +
+  ylim (0,1500)
+```
+
+The plots give us a good overview and confirm that the data is heavily skewed to the right, but we need the tables if we want a more precise analysis.
+
+```{r}
+frequency <- table(L3$apartments_count)
+print(frequency)
+percentage <- prop.table(frequency) * 100
+print(percentage)
+```
+79% of owners only have one apartment, 88% of owners have less than two, and 90% have less than three apartments.
+
+This means that the vast majority of hosts are relatively small owners. There exists big owners, that have up to 152 apartments but they are a minority. Only 0.57 % of owners have more than 100 apartments, and around 2 % have more than 50 apartments.
+
+In conclusion we can say that the majority of owners follow the initial philosophy of the creators of airbnb, which was to lend a home or a room to meet new people and receive an additional income. Nevertheless, we can see that some people are doing it as their main job, managing structures that are similar to those of hotels, which could be seen as an act of unfair competition in some countries.
+
+# Renting price per city quarter ("arrondissemnts")
+
+## Data preparation
+
+We create a new sub-dataset.
+
+```{r}
+L4 <- L
+```
+
+Then we need to turn the prices into numerical values to be able to do calculations. We remove the dollar sign then declare the value as numerical.
+
+```{r}
+L4$price <- as.numeric(gsub("\\$", "", L4$price))
+```
+
+## Data analysis
+
+```{r}
+grouped.L4 = group_by(L4,neighbourhood_cleansed)
+ggplot(data = grouped.L4) +
+  theme_light() +
+  geom_boxplot(aes(x = neighbourhood_cleansed,y = price))
+```
+```{r}
+grouped.L4 = group_by(L4,neighbourhood)
+ggplot(data = grouped.L4) +
+  theme_light() +
+  geom_boxplot(aes(x = neighbourhood,y = price))
+```
+
+This plot does not allow us to read the name of the quarters, but it still allows us to notice a pricing dynamic. The lower the average price is, the more the prices are regrouped around the mean. There could be two different explanations.
+
+The first one would be that the quarters with low prices are quarters where their is a lot of competition to find renters, so there is not a lot of pricing freedom for the owners.
+
+The second reason would be that these quarters are not very popular, so they struggle to attract wealthy customers and they all have to keep their prices low.
+
+Either way, these two hypothesis would lead to the same advice. A owner should try to rent in the quarters where the average prices are higher, because in these quarters he will always have the choice to improve the home/apt to increase the price of the rent. In the low average quarters, improving the home/apt might not be profitable because he might not be able to increase the price of the rent afterwards.
+
+To make our plot more readable we will filter the quarters by their average price.
+
+To do that we need to create a new variable that gives the average price of each quarter.
+
+```{r}
+N_price <- L4 %>%
+  group_by(neighbourhood) %>%
+  summarise(Neighbourhood_average_price = mean(price, na.rm = TRUE))
+
+N_price
+
+NC_price <- L4 %>%
+  group_by(neighbourhood_cleansed) %>%
+  summarise(Neighbourhood_Cl_average_price = mean(price, na.rm = TRUE))
+
+NC_price
+```
+
+We can now merge this new dataframe to the original one using neighbourhood as a key.
+
+```{r}
+L4 <- merge(L4, N_price,  by = "neighbourhood", all.x = TRUE)
+L4 <- merge(L4, NC_price,  by = "neighbourhood_cleansed", all.x = TRUE)
+```
+
+Now we can filter by price.
+
+```{r}
+L41 <- filter(L4, Neighbourhood_Cl_average_price > 100)
+grouped.L4 = group_by(L41,neighbourhood_cleansed)
+ggplot(data = grouped.L4) +
+  theme_light() +
+  geom_boxplot(aes(x = neighbourhood_cleansed,y = price))
+```
+```{r}
+L41 <- filter(L4, Neighbourhood_Cl_average_price < 80)
+grouped.L4 = group_by(L41,neighbourhood_cleansed)
+ggplot(data = grouped.L4) +
+  theme_light() +
+  geom_boxplot(aes(x = neighbourhood_cleansed,y = price))
+```
+
+```{r}
+NC_price_sorted <- NC_price %>%
+  arrange(Neighbourhood_Cl_average_price)
+
+print(NC_price_sorted)
+```
+As we can see from the plots and our summary table, in the neighbourhood_cleansed variable, the quarter where the prices are the highest is l'Elysée (average price of 156 $) and the one with the lowest price is Ménilmontant (average price of 66 $).
+
+```{r}
+L41 <- filter(L4, Neighbourhood_average_price > 155)
+grouped.L4 = group_by(L41,neighbourhood)
+ggplot(data = grouped.L4) +
+  theme_light() +
+  geom_boxplot(aes(x = neighbourhood,y = price))
+```
+
+```{r}
+L41 <- filter(L4, Neighbourhood_average_price < 65)
+grouped.L4 = group_by(L41,neighbourhood)
+ggplot(data = grouped.L4) +
+  theme_light() +
+  geom_boxplot(aes(x = neighbourhood,y = price))
+```
+```{r}
+N_price_sorted <- N_price %>%
+  arrange(Neighbourhood_average_price)
+
+print(N_price_sorted)
+```
+
+As we can see from the plots and our summary table, in the neighbourhood variable, the quarter where the prices are the highest is Cannes (average price of 181 $) and the one with the lowest price is the XIV Arrondissement (average price of 40 $).
+
+
+# Visit frequency of the different quarters according to time
+
+## Data preparation
+
+We start by joining the L (listings) and the R (reservations) tables.
+
+```{r}
+R2 <- R %>%
+  rename("id" = "listing_id")
+
+L5 <- left_join(L, R2, by = "id")
+```
+
+We test the class of the date variable to know if we need to change it.
+
+```{r}
+class(L5$date)
+```
+We change the type to date.
+
+```{r}
+L5$date <- as.Date(L5$date)
+class(L5$date)
+```
+## Data analysis
+
+We start by taking a general overview of the visits through time.
+
+```{r}
+ggplot(L5, aes(x = date)) +
+        geom_histogram() +
+        geom_freqpoly(color= 'red') +
+        labs(title = "Frequency Plot of visits according to time")
+
+ggplot(L5, aes(x = date)) +
+  geom_density() +
+  labs(title = "Density Plot of visits according to time")
+```
+
+As we can see the number of visits has strongly risen between 2012 and mid-2016. The progression was not continuous and seemed to happen during the first semester of each year, before reaching a plateau during the second semester. The number of visits doubled at the beginning of 2013, tripled at the beginning of 2014, doubled at the beginning of 2015, and increased by around 50% at the beginning of 2016.
+
+The only real decrease we can see in the number of visits is during the end of 2015. Since most of the listings of our dataset are in Paris, we can guess that this momentary slowdown was due to the terrorist attacks that happened on the 13th November 2015, because we cannot find any trace of new public regulations on airbnb listings at that time that would discourage people from lending their homes.
+
+The other decrease at the end of the plot is only because of a lack of data for that period.
+
+```{r}
+L51 <- filter(L5, date > "2014-01-01", date < "2015-01-01")
+
+ggplot(L51, aes(x = date)) +
+        geom_histogram() +
+        geom_freqpoly(color= 'red') +
+        labs(title = "Frequency Plot of visits according to time, in a year")
+
+ggplot(L51, aes(x = date)) +
+  geom_density() +
+  labs(title = "Density Plot of visits according to time, in a year")
+```
+
+Regarding the frequency of visits throughout a year, we were expecting the frequency to be the highest during the summer and christmas holidays, but in fact, the busiest period of the year for visits is September and October. The summer and christmas holidays are the second most busiest period and then the lowest is january and febuary.
+
+```{r}
+L51 <- filter(L5, date > "2014-02-01", date < "2014-03-01")
+
+ggplot(L51, aes(x = date)) +
+        geom_histogram() +
+        geom_freqpoly(color= 'red') +
+        labs(title = "Frequency Plot of visits according to time, in a week")
+
+ggplot(L51, aes(x = date)) +
+  geom_density() +
+  labs(title = "Density Plot of visits according to time, in a week")
+```
+
+In the plot above, Feb 03, 10, 17 and 24 are all mondays, and represent the peak of visit frequency. The low point is always during the middle of the weak.
+
+```{r}
+L51 <- filter(L5, neighbourhood %in% c("Champs-Elysées","Batignolles" ,"Ternes"))
+
+ggplot(L51, aes(x = date, color = neighbourhood)) +
+        geom_freqpoly() +
+        labs(title = "Frequency Plot of visits of quarters according to time")
+
+ggplot(L51, aes(x = date, color = neighbourhood)) +
+  geom_density() +
+  labs(title = "Density Plot of visits of quarters according to time")
+```
+
+As we can see, even if quarters don't share the same popularity and the same number of visits, the frequency of visits follows the same dynamic because they share the same city.
+
+
+
